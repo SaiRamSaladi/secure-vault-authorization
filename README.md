@@ -1,57 +1,85 @@
-# Sample Hardhat 3 Beta Project (`mocha` and `ethers`)
+# Secure Vault Authorization System
 
-This project showcases a Hardhat 3 Beta project using `mocha` for tests and the `ethers` library for Ethereum interactions.
+## Overview
 
-To learn more about the Hardhat 3 Beta, please visit the [Getting Started guide](https://hardhat.org/docs/getting-started#getting-started-with-hardhat-3). To share your feedback, join our [Hardhat 3 Beta](https://hardhat.org/hardhat3-beta-telegram-group) Telegram group or [open an issue](https://github.com/NomicFoundation/hardhat/issues/new) in our GitHub issue tracker.
+This project implements a secure, production-style smart contract system for controlled fund withdrawals using a **two-contract architecture**. The system separates **fund custody** from **authorization validation**, mirroring real-world decentralized finance (DeFi) and custody designs.
 
-## Project Overview
+The goal of this project is to demonstrate secure multi-contract design, replay protection, and deterministic state transitions under adversarial execution conditions.
 
-This example project includes:
+---
 
-- A simple Hardhat configuration file.
-- Foundry-compatible Solidity unit tests.
-- TypeScript integration tests using `mocha` and ethers.js
-- Examples demonstrating how to connect to different types of networks, including locally simulating OP mainnet.
+## Architecture Summary
 
-## Usage
+The system consists of **two on-chain smart contracts**:
 
-### Running Tests
+### 1. SecureVault
+- Holds native blockchain currency (ETH)
+- Accepts deposits from any address
+- Executes withdrawals only after authorization validation
+- Never performs signature verification itself
 
-To run all the tests in the project, execute the following command:
+### 2. AuthorizationManager
+- Validates off-chain generated withdrawal permissions
+- Verifies authorization authenticity
+- Ensures each authorization is consumed **exactly once**
+- Prevents replay attacks
 
-```shell
-npx hardhat test
-```
+The vault relies **exclusively** on the AuthorizationManager to approve withdrawals.
 
-You can also selectively run the Solidity or `mocha` tests:
+---
 
-```shell
-npx hardhat test solidity
-npx hardhat test mocha
-```
+## Why Two Contracts?
 
-### Make a deployment to Sepolia
+Separating responsibilities improves security and clarity:
 
-This project includes an example Ignition module to deploy the contract. You can deploy this module to a locally simulated chain or to Sepolia.
+| Concern | Contract |
+|------|--------|
+| Asset custody | SecureVault |
+| Permission validation | AuthorizationManager |
 
-To run the deployment to a local chain:
+This design reduces risk, limits blast radius, and reflects patterns used in real Web3 protocols such as multisig wallets and DAO treasuries.
 
-```shell
-npx hardhat ignition deploy ignition/modules/Counter.ts
-```
+---
 
-To run the deployment to Sepolia, you need an account with funds to send the transaction. The provided Hardhat configuration includes a Configuration Variable called `SEPOLIA_PRIVATE_KEY`, which you can use to set the private key of the account you want to use.
+## Authorization Model
 
-You can set the `SEPOLIA_PRIVATE_KEY` variable using the `hardhat-keystore` plugin or by setting it as an environment variable.
+Withdrawals are permitted only through **off-chain generated authorizations**.
 
-To set the `SEPOLIA_PRIVATE_KEY` config variable using `hardhat-keystore`:
+Each authorization is bound to:
+- A specific vault address
+- A specific blockchain network (chainId)
+- A specific recipient address
+- A specific withdrawal amount
+- A unique authorization identifier (nonce)
 
-```shell
-npx hardhat keystore set SEPOLIA_PRIVATE_KEY
-```
+### Replay Protection
+- Each authorization can be used **only once**
+- The AuthorizationManager tracks consumed authorizations
+- Reuse attempts revert deterministically
 
-After setting the variable, you can run the deployment with the Sepolia network:
+---
 
-```shell
-npx hardhat ignition deploy --network sepolia ignition/modules/Counter.ts
-```
+## Security Guarantees
+
+- ❌ Vault cannot bypass authorization checks
+- ❌ Authorizations cannot be reused
+- ❌ Unauthorized callers cannot influence state
+- ✅ State updates occur before value transfer
+- ✅ Cross-contract calls produce exactly one effect
+- ✅ Initialization logic is protected
+
+---
+
+## Events & Observability
+
+The system emits events for:
+- Deposits
+- Authorization consumption
+- Successful withdrawals
+
+All failed withdrawal attempts revert with deterministic behavior.
+
+---
+
+## Project Structure
+
