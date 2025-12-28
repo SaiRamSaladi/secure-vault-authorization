@@ -1,0 +1,6 @@
+services:
+  deployer:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    command: npx hardhat run scripts/deploy.ts
